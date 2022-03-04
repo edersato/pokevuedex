@@ -3,6 +3,7 @@
         <img
         alt="Pokemon Logo"
         src="../assets/pokeLogo.png"
+        class="imgLogo"
         >
         <h2>A complete Dex with all generations</h2>
 
@@ -75,5 +76,16 @@ export default {
 
 h2 {
   color: #2944df;
+}
+
+@media(max-width: 768px) {
+    h2 {
+        text-align: center;
+    }
+}
+@media(max-width: 524px) {
+    .imgLogo {
+        width: 300px;
+    }
 }
 </style>
