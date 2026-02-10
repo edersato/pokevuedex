@@ -7,7 +7,7 @@
       </button>
       
       <div v-if="pokemon" class="image">
-        <img :src="imageUrl + pokemon.id + '.png'" alt="">
+        <img :src="getCurrentImage()" alt="">
       </div>
 
       <div v-if="pokemon" class="data card-body">
@@ -17,12 +17,12 @@
         <div class="variants-nav" v-if="hasVariants">
           <button 
             v-for="variant in variants" 
-            :key="variant.type"
+            :key="variant.name"
             @click="selectVariant(variant)"
-            :class="{ 'active': currentVariant === variant.type }"
+            :class="{ 'active': currentVariant === variant.name }"
             class="variant-btn"
           >
-            {{ variant.label }}
+            {{ variant.displayName }}
           </button>
         </div>
 
@@ -89,36 +89,20 @@
           </div>
         </div>
 
-        <!-- Variantes Regionais -->
-        <div v-if="regionalVariants.length > 0" class="regional-variants-section">
-          <h3>Variantes Regionais / Regional Variants</h3>
-          <div class="variants-grid">
-            <div 
-              v-for="variant in regionalVariants" 
-              :key="variant.name"
-              class="variant-card"
-              @click="loadPokemonByName(variant.name)"
-            >
-              <img :src="getVariantImage(variant.name)" :alt="variant.name">
-              <span class="variant-name">{{ getFormDisplayName(variant.name) }}</span>
-              <span class="variant-region">{{ variant.region }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Formas Especiais -->
-        <div v-if="specialForms.length > 0" class="special-forms-section">
-          <h3>Formas Especiais / Special Forms</h3>
+        <!-- Formas Disponíveis -->
+        <div v-if="availableForms.length > 0" class="available-forms-section">
+          <h3>Formas Disponíveis / Available Forms</h3>
           <div class="forms-grid">
             <div 
-              v-for="form in specialForms" 
+              v-for="form in availableForms" 
               :key="form.name"
               class="form-card"
               @click="loadPokemonByName(form.name)"
+              :class="{ 'current-form': currentVariant === form.name }"
             >
               <img :src="getFormImage(form)" :alt="form.name">
-              <span class="form-name">{{ getFormDisplayName(form.name) }}</span>
-              <span v-if="form.type" class="form-type">{{ form.type }}</span>
+              <span class="form-name">{{ getFormDisplayName(form) }}</span>
+              <span class="form-type">{{ form.type }}</span>
             </div>
           </div>
         </div>
@@ -168,14 +152,11 @@ export default {
       show: false,
       pokemon: null,
       speciesData: null,
-      formsData: [],
+      allForms: [],
       evolutionChain: [],
-      currentVariant: 'normal',
-      variants: [
-        { type: 'normal', label: 'Normal' }
-      ],
-      regionalVariants: [],
-      specialForms: [],
+      currentVariant: null,
+      variants: [],
+      availableForms: [],
       loading: true
     }      
   },
@@ -206,23 +187,25 @@ export default {
       this.loading = true;
       this.pokemon = null;
       this.evolutionChain = [];
-      this.regionalVariants = [];
-      this.specialForms = [];
+      this.variants = [];
+      this.availableForms = [];
       
       try {
+        // Primeiro, buscar o Pokémon principal
         const response = await fetch(this.pokemonUrl);
         if (!response.ok) throw new Error('Pokémon not found');
         
         this.pokemon = await response.json();
+        this.currentVariant = this.pokemon.name;
         
         // Buscar dados adicionais em paralelo
         await Promise.all([
           this.fetchSpeciesData(),
-          this.fetchFormsData()
+          this.fetchAllForms()
         ]);
         
-        // Analisar variantes
-        this.analyzeVariants();
+        // Preparar variantes
+        this.prepareVariants();
         
         this.show = true;
       } catch (error) {
@@ -246,6 +229,22 @@ export default {
         }
       } catch (error) {
         console.error('Erro ao buscar dados da espécie:', error);
+      }
+    },
+    
+    async fetchAllForms() {
+      if (!this.speciesData?.varieties) return;
+      
+      try {
+        // Buscar dados de todas as variedades
+        const formPromises = this.speciesData.varieties.map(variety => 
+          fetch(variety.pokemon.url).then(res => res.json())
+        );
+        
+        this.allForms = await Promise.all(formPromises);
+      } catch (error) {
+        console.error('Erro ao buscar formas:', error);
+        this.allForms = [];
       }
     },
     
@@ -278,100 +277,88 @@ export default {
       return result;
     },
     
-    async fetchFormsData() {
-      if (!this.pokemon?.forms) return;
+    prepareVariants() {
+      // Adicionar a forma atual como primeira variante
+      const baseForm = {
+        name: this.pokemon.name,
+        displayName: 'Normal',
+        type: 'Normal',
+        sprite: this.pokemon.sprites?.front_default || `${this.imageUrl}${this.pokemon.id}.png`
+      };
       
-      try {
-        const formPromises = this.pokemon.forms
-          .filter(form => form.url !== this.pokemonUrl) // Não incluir a forma atual
-          .map(form => fetch(form.url).then(res => res.json()));
+      this.variants = [baseForm];
+      this.availableForms = [baseForm];
+      
+      // Analisar todas as formas disponíveis
+      this.allForms.forEach(form => {
+        // Pular a forma atual (já adicionada)
+        if (form.name === this.pokemon.name) return;
         
-        this.formsData = await Promise.all(formPromises);
-      } catch (error) {
-        console.error('Erro ao buscar dados das formas:', error);
-        this.formsData = [];
-      }
-    },
-    
-    analyzeVariants() {
-      const baseName = this.pokemon.name.split('-')[0].toLowerCase();
-      
-      // Resetar variantes
-      this.variants = [{ type: 'normal', label: 'Normal' }];
-      this.regionalVariants = [];
-      this.specialForms = [];
-      
-      // Analisar todas as formas
-      this.formsData.forEach(form => {
-        const formName = form.name.toLowerCase();
+        const formData = this.analyzeForm(form);
         
-        // Mega Evolution
-        if (formName.includes('mega')) {
-          const megaType = formName.includes('mega-x') ? 'Mega X' : 
-                          formName.includes('mega-y') ? 'Mega Y' : 'Mega';
-          
-          this.variants.push({
-            type: formName,
-            label: megaType
-          });
-          
-          this.specialForms.push({
-            name: form.name,
-            type: megaType,
-            sprite: form.sprites?.front_default
-          });
+        if (formData) {
+          this.variants.push(formData);
+          this.availableForms.push(formData);
         }
-        
-        // Gigantamax
-        if (formName.includes('gmax') || formName.includes('gigantamax')) {
-          this.variants.push({
-            type: 'gmax',
-            label: 'Gigantamax'
-          });
-          
-          this.specialForms.push({
-            name: form.name,
-            type: 'Gigantamax',
-            sprite: form.sprites?.front_default
-          });
-        }
-        
-        // Variantes Regionais
-        const regions = ['alola', 'galar', 'hisui', 'paldea'];
-        regions.forEach(region => {
-          if (formName.includes(region)) {
-            const regionName = region.charAt(0).toUpperCase() + region.slice(1);
-            this.regionalVariants.push({
-              name: form.name,
-              region: regionName
-            });
-          }
-        });
       });
     },
     
-    selectVariant(variant) {
-      this.currentVariant = variant.type;
-      // Em uma implementação completa, aqui você buscaria os dados da variante
-    },
-    
-    getVariantImage(name) {
-      // Extrair ID do nome (assumindo formato "pokemon-region")
-      const parts = name.split('-');
-      const pokemonId = parts[0];
+    analyzeForm(form) {
+      if (!form || !form.name || !this.pokemon) return null;
       
-      // Para variantes, usar sprite específico se disponível
-      return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonId}.png`;
+      const formName = form.name.toLowerCase();
+      let displayName = 'Normal';
+      let type = 'Normal';
+      
+      // Detectar tipo de forma
+      if (formName.includes('mega')) {
+        if (formName.includes('mega-x')) {
+          displayName = 'Mega X';
+          type = 'Mega X';
+        } else if (formName.includes('mega-y')) {
+          displayName = 'Mega Y';
+          type = 'Mega Y';
+        } else {
+          displayName = 'Mega';
+          type = 'Mega';
+        }
+      } else if (formName.includes('gmax') || formName.includes('gigantamax')) {
+        displayName = 'Gigantamax';
+        type = 'Gigantamax';
+      } else if (formName.includes('alola')) {
+        displayName = 'Alolan';
+        type = 'Alola';
+      } else if (formName.includes('galar')) {
+        displayName = 'Galarian';
+        type = 'Galar';
+      } else if (formName.includes('hisui')) {
+        displayName = 'Hisuian';
+        type = 'Hisui';
+      } else if (formName.includes('paldea')) {
+        displayName = 'Paldean';
+        type = 'Paldea';
+      } else {
+        // Para outras formas, usar o nome formatado
+        displayName = this.getFormDisplayNameFromString(form.name);
+        type = 'Alternative';
+      }
+      
+      return {
+        name: form.name,
+        displayName: displayName,
+        type: type,
+        sprite: form.sprites?.front_default || `${this.imageUrl}${form.id}.png`,
+        formData: form
+      };
     },
     
-    getFormImage(form) {
-      return form.sprite || `${this.imageUrl}${this.pokemon.id}.png`;
-    },
-    
-    getFormDisplayName(name) {
-      // Remove o nome base do Pokémon e formata
+    getFormDisplayNameFromString(formName) {
+      if (!formName || !this.pokemon?.name) return 'Standard';
+      
       const baseName = this.pokemon.name.split('-')[0];
-      let displayName = name.replace(new RegExp(`${baseName}-?`, 'i'), '');
+      let displayName = formName.replace(new RegExp(`${baseName}-?`, 'i'), '');
+      
+      if (!displayName) return 'Standard';
       
       // Formata as palavras
       displayName = displayName.split('-')
@@ -381,10 +368,55 @@ export default {
           if (word.toLowerCase() === 'mega') return 'Mega';
           return word.charAt(0).toUpperCase() + word.slice(1);
         })
-        .filter(word => word) // Remove strings vazias
+        .filter(word => word)
         .join(' ');
       
-      return displayName || 'Standard';
+      return displayName;
+    },
+    
+    getCurrentImage() {
+      if (this.currentVariant === this.pokemon.name) {
+        return this.imageUrl + this.pokemon.id + '.png';
+      }
+      
+      // Encontrar a variante atual
+      const variant = this.variants.find(v => v.name === this.currentVariant);
+      return variant ? variant.sprite : this.imageUrl + this.pokemon.id + '.png';
+    },
+    
+    selectVariant(variant) {
+      this.currentVariant = variant.name;
+      
+      // Se a variante for diferente do Pokémon atual, carregar seus dados
+      if (variant.name !== this.pokemon.name) {
+        this.loadPokemonByName(variant.name);
+      }
+    },
+    
+    getFormImage(form) {
+      return form.sprite || `${this.imageUrl}${this.pokemon.id}.png`;
+    },
+    
+    getFormDisplayName(form) {
+      if (!form || !form.name || !this.pokemon?.name) return 'Standard';
+      
+      const baseName = this.pokemon.name.split('-')[0];
+      let displayName = form.name.replace(new RegExp(`${baseName}-?`, 'i'), '');
+      
+      if (!displayName) return 'Standard';
+      
+      // Formata as palavras
+      displayName = displayName.split('-')
+        .map(word => {
+          // Trata casos especiais
+          if (word.toLowerCase() === 'gmax') return 'G-Max';
+          if (word.toLowerCase() === 'mega') return 'Mega';
+          return word.charAt(0).toUpperCase() + word.slice(1);
+        })
+        .filter(word => word)
+        .join(' ');
+      
+      return displayName;
     },
     
     loadPokemonById(id) {

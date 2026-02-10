@@ -116,6 +116,7 @@
       background: #2944df;
       color: white;
       border-color: #2944df;
+      box-shadow: 0 4px 8px rgba(41, 68, 223, 0.3);
     }
   }
 }
@@ -230,6 +231,7 @@ h3 {
     &:hover {
       transform: translateY(-5px);
       box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      background: #f8f9fa;
     }
     
     img {
@@ -266,15 +268,16 @@ h3 {
       padding: 4px 10px;
       border-radius: 10px;
       text-transform: capitalize;
+      max-width: 120px;
+      word-wrap: break-word;
+      text-align: center;
     }
   }
 }
 
-.regional-variants-section,
-.special-forms-section {
+.available-forms-section {
   margin: 30px 0;
   
-  .variants-grid,
   .forms-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -282,7 +285,6 @@ h3 {
     margin-top: 15px;
   }
   
-  .variant-card,
   .form-card {
     background: white;
     border-radius: 10px;
@@ -299,28 +301,35 @@ h3 {
       border-color: #2944df;
     }
     
+    &.current-form {
+      border-color: #2944df;
+      background: #f0f5ff;
+      box-shadow: 0 5px 15px rgba(41, 68, 223, 0.2);
+    }
+    
     img {
       width: 80px;
       height: 80px;
       margin-bottom: 10px;
     }
     
-    .variant-name,
     .form-name {
       display: block;
       font-weight: 600;
       color: #333;
       margin-bottom: 5px;
+      font-size: 0.9rem;
     }
     
-    .variant-region,
     .form-type {
       display: block;
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       color: #666;
       background: #f8f9fa;
       padding: 3px 8px;
       border-radius: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
   }
 }
@@ -346,6 +355,7 @@ h3 {
       color: #2944df;
       margin-bottom: 5px;
       text-transform: capitalize;
+      font-size: 0.9rem;
     }
     
     .stat-bar {
@@ -385,6 +395,11 @@ h3 {
     color: #ff4444;
     margin-bottom: 10px;
   }
+  
+  p {
+    font-size: 1rem;
+    color: #888;
+  }
 }
 
 .close-bottom {
@@ -404,6 +419,7 @@ h3 {
   &:hover {
     background: #1a35c2;
     transform: scale(1.05);
+    box-shadow: 0 5px 15px rgba(26, 53, 194, 0.3);
   }
   
   i {
@@ -418,10 +434,16 @@ h3 {
   i {
     font-size: 3rem;
     margin-bottom: 20px;
+    animation: spin 1s linear infinite;
   }
   
   p {
     font-size: 1.2rem;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
 }
 
@@ -457,6 +479,7 @@ h3 {
   
   .detail-view {
     max-height: 95vh;
+    width: 95%;
   }
   
   .data {
@@ -477,9 +500,10 @@ h3 {
     }
   }
   
-  .variants-grid,
-  .forms-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+  .available-forms-section {
+    .forms-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 }
 
@@ -495,8 +519,37 @@ h3 {
     }
   }
   
-  .variants-grid,
-  .forms-grid {
-    grid-template-columns: 1fr !important;
+  .available-forms-section {
+    .forms-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .close-bottom {
+    width: 90%;
+    max-width: 200px;
+  }
+}
+
+/* Animações adicionais */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-card {
+  animation: fadeInUp 0.5s ease forwards;
+  opacity: 0;
+  
+  @for $i from 1 through 20 {
+    &:nth-child(#{$i}) {
+      animation-delay: #{$i * 0.1}s;
+    }
   }
 }
