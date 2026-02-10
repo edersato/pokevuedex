@@ -2,7 +2,7 @@
     <div class="container">
         <img
         alt="Pokemon Logo"
-        src="../assets/pokeLogo.png"
+        src="../../assets/pokeLogo.png"
         class="imgLogo"
         >
         <h2>A complete Dex with all generations</h2>
