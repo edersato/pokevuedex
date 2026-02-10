@@ -5,7 +5,7 @@
 </template>
 
 <script>
-import Pokemon from './components/Pokemon.vue'
+import Pokemon from './components/Main/Pokemon.vue'
 
 
 export default {
